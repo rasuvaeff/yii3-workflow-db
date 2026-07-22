@@ -1,0 +1,86 @@
+# AGENTS.md — yii3-workflow-db
+
+Guidance for AI agents working on this package. Read before changing code.
+
+## What this is
+
+`rasuvaeff/yii3-workflow-db` (namespace `Rasuvaeff\Yii3WorkflowDb`) is the
+database backend for `rasuvaeff/yii3-workflow`: it implements the core's
+`Audit\TransitionLog` on `yiisoft/db`, ships the migration for the table, and
+adds a retention command. No workflow logic lives here.
+
+Public API: `DbTransitionLog`, `Command\WorkflowTransitionsPruneCommand`, the
+migration.
+
+## Golden rules
+
+1. **Verification is mandatory.** Never claim "done" without a fresh green
+   `composer build`. "Should work" does not count.
+2. **No suppressions.** No `@psalm-suppress`, no baseline. Fix the root cause.
+3. **The unique index is the product.** Anything that weakens
+   `(workflow, subject_id, idempotency_key)` — dropping it, making it partial,
+   swallowing `IntegrityException` — removes the only reason this package exists
+   over a hand-written 40-line implementation.
+4. **Preserve the public contract.** Update README.md + README.ru.md + llms.txt
+   + tests with any API change.
+
+## Commands
+
+No PHP/Composer on the host — run in Docker via the `composer:2` image. This
+package depends on the sibling core through a path repository, so mount the
+MONOREPO ROOT, not the package directory:
+
+```bash
+docker run --rm -v "$MONOREPO_ROOT":/repo -w /repo/yii3-workflow-db composer:2 composer build
+docker run --rm -v "$MONOREPO_ROOT":/repo -w /repo/yii3-workflow-db composer:2 composer test
+```
+
+Or with Make from inside the package: `make build`, `make cs-fix`, `make psalm`,
+`make test`, `make mutation`.
+
+## Invariants & gotchas
+
+- **`composer.json` carries a path repository** to `../yii3-workflow` plus
+  `minimum-stability: dev` while the core is unpublished; the core declares a
+  `branch-alias` so its branch satisfies `^1.0`. Remove both once the core is on
+  Packagist — do not leave a path repo in a published package.
+- `append()` translates `IntegrityException` into the core's
+  `DuplicateIdempotencyKey`, but only when the record actually carries a key;
+  any other integrity failure (a schema drift, a NOT NULL violation) must
+  propagate unchanged instead of being reported as a replay.
+- The audit row is written inside `apply()`, so a rejected insert leaves the
+  subject mutated in memory. That is documented in both READMEs with a
+  transaction recipe — keep that section accurate.
+- Timestamps are ATOM strings, not native datetimes: ordering must stay
+  lexicographic across drivers, and `prune()` compares strings.
+- `Query::all()` is typed loosely; rows go through `hydrateAll()`, which drops
+  non-array rows and validates every column with `string()`. Do not "simplify"
+  that into a bare `array_map`, psalm level 1 rejects it and a half-hydrated
+  record is worse than an exception.
+- The SQL schema is declared twice: in `migrations/` and inline in the tests
+  (and in `examples/audit-trail.php`). Change one, change all three.
+- Tests run on in-memory SQLite through `yiisoft/db-sqlite`, so `composer build`
+  covers real SQL — including the unique index — with no server. SQLite's type
+  affinity coerces values, so type-guard tests need a genuinely wrong shape
+  (a NULL column), not a wrong scalar.
+- `config/di.php` binds `TransitionLog` — this package is the single source for
+  that key. The core must never bind it (`yiisoft/config` forbids duplicates).
+  `tests/ConfigWiringTest.php` exercises the definitions inside the build gate.
+- Test doubles come from `yiisoft/test-support` (`StaticClock`,
+  `MemorySimpleCache`); do not hand-roll PSR doubles.
+- Code: `declare(strict_types=1)`, `final readonly class`, `#[\Override]`,
+  explicit types.
+- `examples/` is part of the public contract: keep scripts runnable and update
+  `examples/README.md` when example usage changes.
+- **CI workflows are SHA-pinned.** Every `uses:` in `.github/workflows/*.yml`
+  references a 40-char commit SHA with a `# vN` trailing comment. Never revert
+  to floating `@vN` tags; updates go through Dependabot. Workflows carry
+  `permissions: { contents: read }` and `persist-credentials: false` on every
+  checkout. Verify with `zizmor --persona=auditor .github/`.
+
+## When you finish
+
+- Update `README.md` **and `README.ru.md`** (both languages, same commit; and
+  `examples/` if usage changed); update `CHANGELOG.md` when releasing.
+- Re-run `composer build`; if the change affects public API or release safety,
+  also run `make release-check`. Paste the output.

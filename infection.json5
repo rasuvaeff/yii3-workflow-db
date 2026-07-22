@@ -1,0 +1,37 @@
+{
+    "$schema": "vendor/infection/infection/resources/schema.json",
+    "source": {
+        "directories": ["src"]
+    },
+    "logs": {
+        "text": "php://stderr",
+        "summary": "build/infection-summary.log"
+    },
+    "testFramework": "testo",
+    "minMsi": 100,
+    "mutators": {
+        "@default": true,
+        // `(int) $option < 1`: PHP compares numeric strings numerically, so the
+        // cast changes nothing here — it only keeps the comparison honest for
+        // a reader.
+        "CastInt": {
+            "ignore": ["Rasuvaeff\\Yii3WorkflowDb\\Command\\WorkflowTransitionsPruneCommand::days"]
+        },
+        // Dropping `ORDER BY id` is invisible on SQLite, which returns rows in
+        // rowid order anyway; the clause is there for engines that do not
+        // (PostgreSQL, MySQL with a different plan), and the test database
+        // cannot observe the difference.
+        "ArrayItemRemoval": {
+            "ignore": ["Rasuvaeff\\Yii3WorkflowDb\\DbTransitionLog::forSubject"]
+        },
+        // `array_filter(..., is_array(...))` and `array_values()` guard against
+        // a row shape Query::all() cannot currently produce; they exist to keep
+        // hydration total, not to change results.
+        "UnwrapArrayFilter": {
+            "ignore": ["Rasuvaeff\\Yii3WorkflowDb\\DbTransitionLog::hydrateAll"]
+        },
+        "UnwrapArrayValues": {
+            "ignore": ["Rasuvaeff\\Yii3WorkflowDb\\DbTransitionLog::hydrateAll"]
+        }
+    }
+}

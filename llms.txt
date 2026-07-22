@@ -1,0 +1,114 @@
+# rasuvaeff/yii3-workflow-db
+
+Compact API reference for LLM coding assistants.
+
+## Install
+
+```
+composer require rasuvaeff/yii3-workflow-db
+./yii migrate:up --path=@vendor/rasuvaeff/yii3-workflow-db/migrations
+```
+
+## Rules
+
+- This package only implements `Rasuvaeff\Yii3Workflow\Audit\TransitionLog`. All
+  workflow behaviour lives in `rasuvaeff/yii3-workflow` (over symfony/workflow).
+- It is the ONE source binding `TransitionLog` in DI; the core deliberately
+  leaves that key unbound, and two vendor packages binding it would break
+  `yiisoft/config`.
+- Idempotency is enforced by a UNIQUE index on
+  `(workflow, subject_id, idempotency_key)`. `hasIdempotencyKey()` is only a
+  pre-flight check; `append()` is the guarantee and throws
+  `DuplicateIdempotencyKey` on violation, which `IdempotentWorkflow::applyOnce()`
+  reports as `false`.
+- The audit row is written INSIDE `apply()`, after the subject was mutated in
+  memory. Wrap `applyOnce()` + the entity save in one transaction, otherwise a
+  lost race can still be persisted.
+- A NULL idempotency key repeats freely; a non-null one is unique per subject.
+- Timestamps are stored as ATOM strings (`string(30)`), so ordering is
+  lexicographic on every driver; `id` order equals chronological order.
+- Nothing reads the history back at runtime — retention is policy, hence
+  `prune()` and `workflow:transitions:prune`.
+- Tests run on in-memory SQLite; the schema in tests mirrors the migration and
+  must be kept in sync with it.
+
+## Configuration (params.php)
+
+```php
+'rasuvaeff/yii3-workflow-db' => [
+    'table' => 'workflow_transitions',
+    'retentionDays' => 90,
+],
+```
+
+## API reference
+
+```php
+namespace Rasuvaeff\Yii3WorkflowDb;
+
+final readonly class DbTransitionLog implements \Rasuvaeff\Yii3Workflow\Audit\TransitionLog
+{
+    public function __construct(ConnectionInterface $db, string $table = 'workflow_transitions');
+
+    /** @throws \Rasuvaeff\Yii3Workflow\Audit\DuplicateIdempotencyKey */
+    public function append(TransitionRecord $record): void;
+
+    /** @return list<TransitionRecord> chronological */
+    public function forSubject(string $workflow, string $subjectId): array;
+
+    public function hasIdempotencyKey(string $workflow, string $subjectId, string $key): bool;
+
+    /** @return list<TransitionRecord> newest first */
+    public function latest(string $workflow, int $limit = 50, int $offset = 0): array;
+
+    /** @return int deleted rows */
+    public function prune(\DateTimeImmutable $before): int;
+}
+
+namespace Rasuvaeff\Yii3WorkflowDb\Command;
+
+final class WorkflowTransitionsPruneCommand extends Command   // workflow:transitions:prune
+{
+    public function __construct(DbTransitionLog $log, ClockInterface $clock, int $defaultDays = 90);
+}
+```
+
+## Schema
+
+```
+workflow_transitions
+  id              bigint pk
+  workflow        string(64)   not null
+  subject_id      string(128)  not null
+  transition      string(64)   not null
+  from_place      string(512)  not null    -- comma-joined for Petri nets
+  to_place        string(512)  not null
+  at              string(30)   not null    -- ATOM
+  idempotency_key string(128)  null
+
+  index  idx_workflow_transitions_subject     (workflow, subject_id, id)
+  index  idx_workflow_transitions_at          (at)
+  unique uq_workflow_transitions_idempotency  (workflow, subject_id, idempotency_key)
+```
+
+## Console
+
+```
+./yii workflow:transitions:prune                     # configured retentionDays
+./yii workflow:transitions:prune --older-than=30
+./yii workflow:transitions:prune --older-than=30 --dry-run
+```
+
+## Minimal example
+
+```php
+$this->db->transaction(function () use ($order, $requestId): void {
+    if (!$this->registry->get('order')->applyOnce($order, 'ship', $requestId)) {
+        return;   // replay
+    }
+
+    $this->orders->save($order);
+});
+
+$history = $this->log->forSubject('order', $order->getId());
+```
