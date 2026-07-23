@@ -33,10 +33,11 @@ MONOREPO ROOT, not the package directory:
 ```bash
 docker run --rm -v "$MONOREPO_ROOT":/repo -w /repo/yii3-workflow-db composer:2 composer build
 docker run --rm -v "$MONOREPO_ROOT":/repo -w /repo/yii3-workflow-db composer:2 composer test
+docker run --rm -v "$MONOREPO_ROOT":/repo -w /repo/yii3-workflow-db composer:2 composer test:integration
 ```
 
 Or with Make from inside the package: `make build`, `make cs-fix`, `make psalm`,
-`make test`, `make mutation`.
+`make test`, `make test-integration`, `make mutation`.
 
 ## Invariants & gotchas
 
@@ -59,8 +60,10 @@ Or with Make from inside the package: `make build`, `make cs-fix`, `make psalm`,
   record is worse than an exception.
 - The SQL schema is declared twice: in `migrations/` and inline in the tests
   (and in `examples/audit-trail.php`). Change one, change all three.
-- Tests run on in-memory SQLite through `yiisoft/db-sqlite`, so `composer build`
-  covers real SQL — including the unique index — with no server. SQLite's type
+- Unit and integration tests run on in-memory SQLite through `yiisoft/db-sqlite`,
+  so the integration suite covers real SQL and the migration, with no server.
+  `composer build` runs the unit suite; use `composer test:integration` for the
+  integration suite. SQLite's type
   affinity coerces values, so type-guard tests need a genuinely wrong shape
   (a NULL column), not a wrong scalar.
 - `config/di.php` binds `TransitionLog` — this package is the single source for

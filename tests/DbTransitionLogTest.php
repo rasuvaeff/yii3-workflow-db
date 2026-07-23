@@ -16,6 +16,7 @@ use Testo\Lifecycle\BeforeTest;
 use Testo\Test;
 use Yiisoft\Db\Cache\SchemaCache;
 use Yiisoft\Db\Connection\ConnectionInterface;
+use Yiisoft\Db\Exception\IntegrityException;
 use Yiisoft\Db\Sqlite\Connection as SqliteConnection;
 use Yiisoft\Db\Sqlite\Driver as SqliteDriver;
 use Yiisoft\Test\Support\SimpleCache\MemorySimpleCache;
@@ -121,6 +122,16 @@ final class DbTransitionLogTest
         $this->log->append($this->record(transition: 'ship', key: 'req-1'));
     }
 
+    public function propagatesAnIntegrityErrorThatIsNotADuplicateKey(): void
+    {
+        $this->db->createCommand(sql: 'CREATE UNIQUE INDEX uq_workflow_transitions_transition ON workflow_transitions (transition)')->execute();
+        $this->log->append($this->record(transition: 'pay'));
+
+        Expect::exception(IntegrityException::class);
+
+        $this->log->append($this->record(transition: 'pay', key: 'req-2'));
+    }
+
     public function theSameKeyIsFreeForAnotherSubject(): void
     {
         $this->log->append($this->record(key: 'req-1'));
@@ -155,6 +166,22 @@ final class DbTransitionLogTest
             ['pay'],
         );
         Assert::same($this->log->latest('invoice'), []);
+    }
+
+    public function rejectsInvalidLatestPaging(): void
+    {
+        Expect::exception(\InvalidArgumentException::class)->withMessageContaining('Limit');
+        $this->log->latest('order', 0);
+
+        Expect::exception(\InvalidArgumentException::class)->withMessageContaining('Offset');
+        $this->log->latest('order', offset: -1);
+    }
+
+    public function rejectsAnInvalidTableName(): void
+    {
+        Expect::exception(\InvalidArgumentException::class)->withMessageContaining('Invalid table name');
+
+        new DbTransitionLog($this->db, 'workflow transitions');
     }
 
     public function pruneDeletesOnlyOlderRecords(): void

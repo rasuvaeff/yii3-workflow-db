@@ -143,12 +143,14 @@ make build       # validate + normalize + require-checker + cs + psalm + test
 make cs-fix
 make psalm
 make test
+make test-integration
 make mutation    # нужен pcov; Makefile его ставит
 ```
 
-Тесты идут на in-memory SQLite, поэтому `composer build` покрывает настоящий SQL
-без сервера. PHP и Composer на хосте нет — все цели выполняются в Docker-образе
-`composer:2`.
+Unit- и интеграционные тесты идут на in-memory SQLite, поэтому для базы и
+миграций сервер не нужен. `make build` запускает unit-набор; для SQLite
+интеграционных тестов используйте `make test-integration`. PHP и Composer на
+хосте нет — все цели выполняются в Docker-образе `composer:2`.
 
 ## Лицензия
 

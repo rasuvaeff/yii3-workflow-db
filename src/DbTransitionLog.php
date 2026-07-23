@@ -32,7 +32,11 @@ final readonly class DbTransitionLog implements TransitionLog
     public function __construct(
         private ConnectionInterface $db,
         private string $table = 'workflow_transitions',
-    ) {}
+    ) {
+        if (\preg_match('/^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)?$/D', $table) !== 1) {
+            throw new \InvalidArgumentException(sprintf('Invalid table name "%s"', $table));
+        }
+    }
 
     /** @throws DuplicateIdempotencyKey */
     #[\Override]
@@ -49,7 +53,9 @@ final readonly class DbTransitionLog implements TransitionLog
                 'idempotency_key' => $record->idempotencyKey,
             ])->execute();
         } catch (IntegrityException $exception) {
-            if ($record->idempotencyKey === null) {
+            if ($record->idempotencyKey === null
+                || !$this->hasIdempotencyKey($record->workflow, $record->subjectId, $record->idempotencyKey)
+            ) {
                 throw $exception;
             }
 
@@ -89,6 +95,14 @@ final readonly class DbTransitionLog implements TransitionLog
      */
     public function latest(string $workflow, int $limit = 50, int $offset = 0): array
     {
+        if ($limit < 1) {
+            throw new \InvalidArgumentException('Limit must be a positive integer');
+        }
+
+        if ($offset < 0) {
+            throw new \InvalidArgumentException('Offset must not be negative');
+        }
+
         return $this->hydrateAll(
             $this->query()
                 ->where(['workflow' => $workflow])

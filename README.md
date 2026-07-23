@@ -144,12 +144,14 @@ make build       # validate + normalize + require-checker + cs + psalm + test
 make cs-fix
 make psalm
 make test
+make test-integration
 make mutation    # requires pcov; the Makefile bootstraps it
 ```
 
-Tests run against in-memory SQLite, so `composer build` covers the real SQL —
-no server required. No PHP or Composer on the host: every target runs inside the
-`composer:2` Docker image.
+Unit and integration tests run against in-memory SQLite, so the database and
+migration paths need no server. `make build` runs the unit suite; run
+`make test-integration` for the SQLite integration suite. No PHP or Composer on
+the host: every target runs inside the `composer:2` Docker image.
 
 ## License
 

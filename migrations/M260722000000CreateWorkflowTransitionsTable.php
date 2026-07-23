@@ -18,7 +18,12 @@ final class M260722000000CreateWorkflowTransitionsTable implements
     TransactionalMigrationInterface
 {
     /** @param non-empty-string $table */
-    public function __construct(private readonly string $table = 'workflow_transitions') {}
+    public function __construct(private readonly string $table = 'workflow_transitions')
+    {
+        if (preg_match('/^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)?$/D', $table) !== 1) {
+            throw new InvalidArgumentException(sprintf('Invalid table name "%s"', $table));
+        }
+    }
 
     #[\Override]
     public function up(MigrationBuilder $b): void

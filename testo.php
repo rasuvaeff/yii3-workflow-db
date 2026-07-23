@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Testo\Application\Config\ApplicationConfig;
+use Testo\Application\Config\FinderConfig;
 use Testo\Application\Config\SuiteConfig;
 
 return new ApplicationConfig(
@@ -10,7 +11,11 @@ return new ApplicationConfig(
     suites: [
         new SuiteConfig(
             name: 'Unit',
-            location: ['tests'],
+            location: new FinderConfig(include: ['tests'], exclude: ['tests/Integration']),
+        ),
+        new SuiteConfig(
+            name: 'Integration',
+            location: new FinderConfig(include: ['tests/Integration']),
         ),
         new SuiteConfig(
             name: 'Benchmarks',
