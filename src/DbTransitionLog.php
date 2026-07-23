@@ -21,8 +21,10 @@ use Yiisoft\Db\Query\Query;
  * translated into {@see DuplicateIdempotencyKey}, which
  * `IdempotentWorkflow::applyOnce()` reports as a replay.
  *
- * Timestamps are stored as ATOM strings so ordering is lexicographic and
- * identical across drivers.
+ * Timestamps are normalised to UTC and stored as ATOM strings, so ordering is
+ * lexicographic and identical across drivers. Without the normalisation a
+ * varying UTC offset (a DST switch, app servers in different timezones) would
+ * break the string ordering that {@see prune()} relies on.
  *
  * @api
  */
@@ -49,7 +51,7 @@ final readonly class DbTransitionLog implements TransitionLog
                 'transition' => $record->transition,
                 'from_place' => $record->from,
                 'to_place' => $record->to,
-                'at' => $record->at->format(\DateTimeInterface::ATOM),
+                'at' => $this->utc($record->at),
                 'idempotency_key' => $record->idempotencyKey,
             ])->execute();
         } catch (IntegrityException $exception) {
@@ -122,13 +124,18 @@ final readonly class DbTransitionLog implements TransitionLog
     public function prune(\DateTimeImmutable $before): int
     {
         return $this->db->createCommand()->delete($this->table, [
-            '<', 'at', $before->format(\DateTimeInterface::ATOM),
+            '<', 'at', $this->utc($before),
         ])->execute();
     }
 
     private function query(): Query
     {
         return (new Query($this->db))->from($this->table);
+    }
+
+    private function utc(\DateTimeImmutable $at): string
+    {
+        return $at->setTimezone(new \DateTimeZone('UTC'))->format(\DateTimeInterface::ATOM);
     }
 
     /**

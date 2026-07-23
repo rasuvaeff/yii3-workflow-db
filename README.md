@@ -69,11 +69,22 @@ return [
 | `subject_id` | string(128) | from `SubjectIdentity::workflowSubjectId()` |
 | `transition` | string(64) | applied transition |
 | `from_place` / `to_place` | string(512) | comma-joined for Petri-net transitions |
-| `at` | string(30) | ATOM, so ordering is lexicographic on every driver |
+| `at` | string(30) | ATOM normalised to UTC, so ordering is lexicographic on every driver |
 | `idempotency_key` | string(128), nullable | NULL repeats freely; a value is unique per subject |
 
 Indexes: `(workflow, subject_id, id)` for a subject's history, `(at)` for
 pruning and reports, and the **unique** `(workflow, subject_id, idempotency_key)`.
+
+Timestamps are converted to UTC before they are stored: with a varying UTC
+offset (a DST switch, app servers in different timezones) the string ordering
+that pruning relies on would break.
+
+The migration adapts the unique index to the driver. MySQL, PostgreSQL and
+SQLite treat NULLs in a unique index as distinct, so a plain index already lets
+key-less rows repeat; MSSQL and Oracle compare them as equal, so there the
+index covers keyed rows only (a filtered index on MSSQL, a function-based one
+on Oracle). Tests run against SQLite — treat the MSSQL/Oracle paths as
+best-effort and verify them in your environment.
 
 ## Usage
 
@@ -123,6 +134,10 @@ $this->db->transaction(function () use ($order, $requestId): void {
 ./yii workflow:transitions:prune --older-than=30
 ./yii workflow:transitions:prune --older-than=30 --dry-run
 ```
+
+Pruning also forgets idempotency keys: a request replayed with a key older than
+the retention window is applied again. Keep the window longer than the longest
+plausible replay (client retries, queue redeliveries).
 
 ## Security
 

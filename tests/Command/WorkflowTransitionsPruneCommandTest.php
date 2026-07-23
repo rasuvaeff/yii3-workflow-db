@@ -110,7 +110,7 @@ final class WorkflowTransitionsPruneCommandTest
     public function rejectsAnAgeThatIsNotAPositiveNumber(): void
     {
         Expect::exception(\InvalidArgumentException::class)
-            ->withMessageContaining('must be a positive number of days');
+            ->withMessageContaining('must be a positive whole number of days');
 
         $this->tester()->execute(['--older-than' => 'yesterday']);
     }
@@ -118,9 +118,27 @@ final class WorkflowTransitionsPruneCommandTest
     public function rejectsAZeroAge(): void
     {
         Expect::exception(\InvalidArgumentException::class)
-            ->withMessageContaining('must be a positive number of days');
+            ->withMessageContaining('must be a positive whole number of days');
 
         $this->tester()->execute(['--older-than' => '0']);
+    }
+
+    public function rejectsAFractionalAge(): void
+    {
+        // is_numeric() would accept "2.9" and silently truncate it to 2 days.
+        Expect::exception(\InvalidArgumentException::class)
+            ->withMessageContaining('must be a positive whole number of days');
+
+        $this->tester()->execute(['--older-than' => '2.9']);
+    }
+
+    public function rejectsATrailingNewlineAge(): void
+    {
+        // Without the /D modifier `$` would match before a trailing newline.
+        Expect::exception(\InvalidArgumentException::class)
+            ->withMessageContaining('must be a positive whole number of days');
+
+        $this->tester()->execute(['--older-than' => "30\n"]);
     }
 
     private function tester(): CommandTester

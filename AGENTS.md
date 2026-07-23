@@ -52,8 +52,18 @@ Or with Make from inside the package: `make build`, `make cs-fix`, `make psalm`,
 - The audit row is written inside `apply()`, so a rejected insert leaves the
   subject mutated in memory. That is documented in both READMEs with a
   transaction recipe — keep that section accurate.
-- Timestamps are ATOM strings, not native datetimes: ordering must stay
-  lexicographic across drivers, and `prune()` compares strings.
+- Timestamps are ATOM strings normalised to UTC, not native datetimes: ordering
+  must stay lexicographic across drivers, and `prune()` compares strings. The
+  UTC normalisation in `DbTransitionLog::utc()` is load-bearing — with a varying
+  offset (DST, mixed-timezone servers) the string comparison breaks.
+- The migration branches the unique index by driver: plain on MySQL/PostgreSQL/
+  SQLite (NULLs are distinct), filtered (`WHERE idempotency_key IS NOT NULL`) on
+  MSSQL, function-based (CASE expressions) on Oracle — both compare NULLs as
+  equal, and most audit rows carry no key. Only the SQLite branch is covered by
+  tests; treat the other two as best-effort and keep them in sync.
+- `prune()` deletes idempotency keys along with history: the replay-protection
+  window equals the retention window. That trade-off is documented in both
+  READMEs — keep it that way.
 - `Query::all()` is typed loosely; rows go through `hydrateAll()`, which drops
   non-array rows and validates every column with `string()`. Do not "simplify"
   that into a bare `array_map`, psalm level 1 rejects it and a half-hydrated

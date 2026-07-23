@@ -25,10 +25,18 @@ composer require rasuvaeff/yii3-workflow-db
   memory. Wrap `applyOnce()` + the entity save in one transaction, otherwise a
   lost race can still be persisted.
 - A NULL idempotency key repeats freely; a non-null one is unique per subject.
-- Timestamps are stored as ATOM strings (`string(30)`), so ordering is
-  lexicographic on every driver; `id` order equals chronological order.
+  The migration adapts the unique index to the driver: plain on MySQL/
+  PostgreSQL/SQLite (NULLs are distinct there), filtered on MSSQL,
+  function-based on Oracle (both compare NULLs as equal). Only the SQLite path
+  is covered by tests.
+- Timestamps are normalised to UTC and stored as ATOM strings (`string(30)`),
+  so ordering is lexicographic on every driver; `id` order equals chronological
+  order. Without the normalisation a varying UTC offset (DST, mixed-timezone
+  servers) would break the string comparison `prune()` uses.
 - Nothing reads the history back at runtime — retention is policy, hence
-  `prune()` and `workflow:transitions:prune`.
+  `prune()` and `workflow:transitions:prune`. Pruning also forgets idempotency
+  keys: a replay older than the retention window is applied again, so keep the
+  window longer than the longest plausible replay.
 - Tests run on in-memory SQLite; the schema in tests mirrors the migration and
   must be kept in sync with it.
 
@@ -83,7 +91,7 @@ workflow_transitions
   transition      string(64)   not null
   from_place      string(512)  not null    -- comma-joined for Petri nets
   to_place        string(512)  not null
-  at              string(30)   not null    -- ATOM
+  at              string(30)   not null    -- ATOM, normalised to UTC
   idempotency_key string(128)  null
 
   index  idx_workflow_transitions_subject     (workflow, subject_id, id)

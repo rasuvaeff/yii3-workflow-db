@@ -168,6 +168,17 @@ final class DbTransitionLogTest
         Assert::same($this->log->latest('invoice'), []);
     }
 
+    public function acceptsTheSmallestValidLimit(): void
+    {
+        $this->log->append($this->record(transition: 'pay'));
+        $this->log->append($this->record(transition: 'ship'));
+
+        Assert::same(
+            \array_map(static fn(TransitionRecord $r): string => $r->transition, $this->log->latest('order', 1)),
+            ['ship'],
+        );
+    }
+
     public function rejectsInvalidLatestPaging(): void
     {
         Expect::exception(\InvalidArgumentException::class)->withMessageContaining('Limit');
@@ -184,6 +195,15 @@ final class DbTransitionLogTest
         new DbTransitionLog($this->db, 'workflow transitions');
     }
 
+    public function rejectsATableNameWithATrailingNewline(): void
+    {
+        // Without the /D modifier `$` would match before a trailing newline and
+        // let the name through into interpolated SQL.
+        Expect::exception(\InvalidArgumentException::class)->withMessageContaining('Invalid table name');
+
+        new DbTransitionLog($this->db, "workflow_transitions\n");
+    }
+
     public function pruneDeletesOnlyOlderRecords(): void
     {
         $this->log->append($this->record(at: '2026-01-01T00:00:00+00:00'));
@@ -193,6 +213,27 @@ final class DbTransitionLogTest
 
         Assert::same($deleted, 1);
         Assert::same(\count($this->log->forSubject('order', 'o-1')), 1);
+    }
+
+    public function normalisesTimestampsToUtc(): void
+    {
+        // Stored strings must share one offset, or the lexicographic ordering
+        // prune() relies on breaks whenever the clock's offset varies (DST,
+        // app servers in different timezones).
+        $this->log->append($this->record(at: '2026-07-22T15:00:00+03:00'));
+
+        $at = $this->log->forSubject('order', 'o-1')[0]->at;
+
+        Assert::same($at->format(\DateTimeInterface::ATOM), '2026-07-22T12:00:00+00:00');
+    }
+
+    public function pruneComparesInstantsNotLocalStrings(): void
+    {
+        // 02:30+02:00 is 00:30 UTC — older than the 01:00 UTC cut-off, even
+        // though the raw local string sorts after it.
+        $this->log->append($this->record(at: '2026-07-23T02:30:00+02:00'));
+
+        Assert::same($this->log->prune(new \DateTimeImmutable('2026-07-23T01:00:00+00:00')), 1);
     }
 
     public function honoursACustomTableName(): void

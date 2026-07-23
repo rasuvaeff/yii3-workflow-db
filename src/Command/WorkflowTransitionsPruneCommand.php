@@ -19,6 +19,10 @@ use Symfony\Component\Console\Output\OutputInterface;
  * reads it back, so retention is a policy the application owns. Without a
  * schedule for this command the table is an unbounded log.
  *
+ * Pruning also forgets idempotency keys: a request replayed with a key older
+ * than the retention window is applied again, so the window must exceed the
+ * longest plausible replay (client retries, queue redeliveries).
+ *
  * @api
  */
 #[AsCommand(name: 'workflow:transitions:prune', description: 'Delete workflow transition history older than N days')]
@@ -39,7 +43,7 @@ final class WorkflowTransitionsPruneCommand extends Command
             'older-than',
             'o',
             InputOption::VALUE_REQUIRED,
-            'Age in days; records older than this are deleted',
+            'Age in whole days; records older than this are deleted, along with their idempotency keys',
         );
         $this->addOption('dry-run', null, InputOption::VALUE_NONE, 'Report the cut-off without deleting');
     }
@@ -70,8 +74,10 @@ final class WorkflowTransitionsPruneCommand extends Command
             return $this->defaultDays;
         }
 
-        if (!\is_numeric($option) || (int) $option < 1) {
-            throw new \InvalidArgumentException('Option --older-than must be a positive number of days');
+        // Strictly whole days: is_numeric() would let "2.9" or "1e2" through
+        // and silently truncate.
+        if (!\is_string($option) || \preg_match('/^[1-9][0-9]*$/D', $option) !== 1) {
+            throw new \InvalidArgumentException('Option --older-than must be a positive whole number of days');
         }
 
         return (int) $option;

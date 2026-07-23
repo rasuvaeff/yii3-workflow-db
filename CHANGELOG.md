@@ -16,3 +16,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   admin screens and `prune()` with the `workflow:transitions:prune` command.
 - Binds `TransitionLog` in DI as the single source for that key; the table name
   and the default retention come from `params.php`.
+- Timestamps are normalised to UTC before storage, so the lexicographic
+  ordering `prune()` relies on holds under DST switches and mixed-timezone
+  servers.
+- The migration adapts the unique index to the driver: filtered on MSSQL and
+  function-based on Oracle, where NULLs in a unique index compare as equal and
+  a plain index would reject the second key-less row of a subject.
+- `workflow:transitions:prune` accepts only whole positive day counts and
+  documents that pruning erases idempotency keys along with history.

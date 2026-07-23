@@ -82,6 +82,30 @@ final class MigrationTest
         Assert::null($this->db->getTableSchema('workflow_transitions', true));
     }
 
+    public function keyLessRowsRepeatFreelyUnderTheUniqueIndex(): void
+    {
+        // Most audit rows carry no idempotency key; the unique index must not
+        // treat two NULLs of one subject as a duplicate.
+        (new M260722000000CreateWorkflowTransitionsTable())->up($this->builder);
+
+        foreach (['pay', 'ship'] as $transition) {
+            $this->db->createCommand()->insert('workflow_transitions', [
+                'workflow' => 'order',
+                'subject_id' => 'order-1',
+                'transition' => $transition,
+                'from_place' => 'pending',
+                'to_place' => 'paid',
+                'at' => '2026-07-23T12:00:00+00:00',
+                'idempotency_key' => null,
+            ])->execute();
+        }
+
+        Assert::same(
+            (int) (new \Yiisoft\Db\Query\Query($this->db))->from('workflow_transitions')->count(),
+            2,
+        );
+    }
+
     public function createsAUsableCustomTable(): void
     {
         (new M260722000000CreateWorkflowTransitionsTable(table: 'custom_transitions'))->up($this->builder);
