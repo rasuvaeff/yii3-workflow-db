@@ -45,15 +45,22 @@ final readonly class DbTransitionLog implements TransitionLog
     public function append(TransitionRecord $record): void
     {
         try {
-            $this->db->createCommand()->insert($this->table, [
-                'workflow' => $record->workflow,
-                'subject_id' => $record->subjectId,
-                'transition' => $record->transition,
-                'from_place' => $record->from,
-                'to_place' => $record->to,
-                'at' => $this->utc($record->at),
-                'idempotency_key' => $record->idempotencyKey,
-            ])->execute();
+            // The nested transaction is a savepoint: on PostgreSQL a failed
+            // INSERT aborts the surrounding transaction, and the
+            // hasIdempotencyKey() probe in the catch below would itself fail
+            // with "current transaction is aborted". Rolling back to the
+            // savepoint keeps the caller's transaction usable.
+            $this->db->transaction(function () use ($record): void {
+                $this->db->createCommand()->insert($this->table, [
+                    'workflow' => $record->workflow,
+                    'subject_id' => $record->subjectId,
+                    'transition' => $record->transition,
+                    'from_place' => $record->from,
+                    'to_place' => $record->to,
+                    'at' => $this->utc($record->at),
+                    'idempotency_key' => $record->idempotencyKey,
+                ])->execute();
+            });
         } catch (IntegrityException $exception) {
             if ($record->idempotencyKey === null
                 || !$this->hasIdempotencyKey($record->workflow, $record->subjectId, $record->idempotencyKey)
@@ -113,6 +120,14 @@ final readonly class DbTransitionLog implements TransitionLog
                 ->offset($offset)
                 ->all(),
         );
+    }
+
+    /** How many rows one workflow holds — the total an admin pager needs next to {@see latest()}. */
+    public function count(string $workflow): int
+    {
+        return (int) $this->query()
+            ->where(['workflow' => $workflow])
+            ->count();
     }
 
     /**

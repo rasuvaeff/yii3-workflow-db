@@ -106,6 +106,7 @@ use Rasuvaeff\Yii3WorkflowDb\DbTransitionLog;
 
 $log->forSubject('order', $order->getId());   // chronological
 $log->latest('order', limit: 50, offset: 0);  // newest first, for an admin screen
+$log->count('order');                         // total rows, for the pager
 $log->prune(new DateTimeImmutable('-90 days'));
 ```
 
@@ -126,6 +127,35 @@ $this->db->transaction(function () use ($order, $requestId): void {
     $this->orders->save($order);
 });
 ```
+
+`WorkflowTransaction` makes the recipe a single call — the `then` closure runs
+inside the same transaction and only when the transition was actually applied:
+
+```php
+use Rasuvaeff\Yii3WorkflowDb\WorkflowTransaction;
+
+final readonly class ShipOrderHandler
+{
+    public function __construct(
+        private WorkflowRegistry $registry,
+        private WorkflowTransaction $transaction,
+    ) {}
+
+    public function handle(Order $order, string $requestId): void
+    {
+        $this->transaction->applyOnce(
+            $this->registry->get('order'),
+            $order,
+            'ship',
+            $requestId,
+            then: fn() => $this->orders->save($order),
+        );
+    }
+}
+```
+
+A failed save rolls the audit row back with everything else, so the key is not
+burnt and a retry can succeed.
 
 ### Pruning
 

@@ -105,6 +105,7 @@ use Rasuvaeff\Yii3WorkflowDb\DbTransitionLog;
 
 $log->forSubject('order', $order->getId());   // хронологически
 $log->latest('order', limit: 50, offset: 0);  // свежие первыми, для админки
+$log->count('order');                         // всего строк, для пейджера
 $log->prune(new DateTimeImmutable('-90 days'));
 ```
 
@@ -125,6 +126,35 @@ $this->db->transaction(function () use ($order, $requestId): void {
     $this->orders->save($order);
 });
 ```
+
+`WorkflowTransaction` сводит рецепт к одному вызову — замыкание `then`
+выполняется в той же транзакции и только если переход действительно применился:
+
+```php
+use Rasuvaeff\Yii3WorkflowDb\WorkflowTransaction;
+
+final readonly class ShipOrderHandler
+{
+    public function __construct(
+        private WorkflowRegistry $registry,
+        private WorkflowTransaction $transaction,
+    ) {}
+
+    public function handle(Order $order, string $requestId): void
+    {
+        $this->transaction->applyOnce(
+            $this->registry->get('order'),
+            $order,
+            'ship',
+            $requestId,
+            then: fn() => $this->orders->save($order),
+        );
+    }
+}
+```
+
+Упавший `save()` откатывает и строку аудита, поэтому ключ не сжигается и повтор
+может пройти.
 
 ### Очистка
 

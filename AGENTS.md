@@ -9,8 +9,8 @@ database backend for `rasuvaeff/yii3-workflow`: it implements the core's
 `Audit\TransitionLog` on `yiisoft/db`, ships the migration for the table, and
 adds a retention command. No workflow logic lives here.
 
-Public API: `DbTransitionLog`, `Command\WorkflowTransitionsPruneCommand`, the
-migration.
+Public API: `DbTransitionLog`, `WorkflowTransaction`,
+`Command\WorkflowTransitionsPruneCommand`, the migration.
 
 ## Golden rules
 
@@ -64,6 +64,10 @@ Or with Make from inside the package: `make build`, `make cs-fix`, `make psalm`,
 - `prune()` deletes idempotency keys along with history: the replay-protection
   window equals the retention window. That trade-off is documented in both
   READMEs — keep it that way.
+- `WorkflowTransaction::applyOnce()` exists so a failed save cannot burn the
+  key: the `then` closure runs inside the SAME transaction and only when the
+  transition applied. It is deliberately not bound in `config/di.php` — the
+  container autowires it from `ConnectionInterface`.
 - `Query::all()` is typed loosely; rows go through `hydrateAll()`, which drops
   non-array rows and validates every column with `string()`. Do not "simplify"
   that into a bare `array_map`, psalm level 1 rejects it and a half-hydrated

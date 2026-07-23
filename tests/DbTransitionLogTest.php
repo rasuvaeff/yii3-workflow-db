@@ -122,6 +122,25 @@ final class DbTransitionLogTest
         $this->log->append($this->record(transition: 'ship', key: 'req-1'));
     }
 
+    public function aDuplicateInsideACallerTransactionLeavesItUsable(): void
+    {
+        // The insert runs under a savepoint: on PostgreSQL a failed statement
+        // aborts the whole transaction otherwise, and the caller's save()
+        // after a caught replay would fail with "transaction is aborted".
+        $this->log->append($this->record(key: 'req-1'));
+
+        $this->db->transaction(function (): void {
+            try {
+                $this->log->append($this->record(transition: 'ship', key: 'req-1'));
+            } catch (DuplicateIdempotencyKey) {
+            }
+
+            $this->log->append($this->record(transition: 'ship', key: 'req-2'));
+        });
+
+        Assert::same(\count($this->log->forSubject('order', 'o-1')), 2);
+    }
+
     public function propagatesAnIntegrityErrorThatIsNotADuplicateKey(): void
     {
         $this->db->createCommand(sql: 'CREATE UNIQUE INDEX uq_workflow_transitions_transition ON workflow_transitions (transition)')->execute();
@@ -166,6 +185,17 @@ final class DbTransitionLogTest
             ['pay'],
         );
         Assert::same($this->log->latest('invoice'), []);
+    }
+
+    public function countsRowsPerWorkflow(): void
+    {
+        $this->log->append($this->record());
+        $this->log->append($this->record(transition: 'ship'));
+        $this->log->append($this->record(workflow: 'invoice'));
+
+        Assert::same($this->log->count('order'), 2);
+        Assert::same($this->log->count('invoice'), 1);
+        Assert::same($this->log->count('unknown'), 0);
     }
 
     public function acceptsTheSmallestValidLimit(): void

@@ -69,8 +69,27 @@ final readonly class DbTransitionLog implements \Rasuvaeff\Yii3Workflow\Audit\Tr
     /** @return list<TransitionRecord> newest first */
     public function latest(string $workflow, int $limit = 50, int $offset = 0): array;
 
+    /** @return int total rows of one workflow — the pager total for latest() */
+    public function count(string $workflow): int;
+
     /** @return int deleted rows */
     public function prune(\DateTimeImmutable $before): int;
+}
+
+// applyOnce() + your persistence in ONE database transaction, so a failed save
+// cannot burn the idempotency key. `then` runs only when the transition applied.
+final readonly class WorkflowTransaction
+{
+    public function __construct(ConnectionInterface $db);
+
+    public function applyOnce(
+        IdempotentWorkflow $workflow,
+        object $subject,
+        string $transitionName,
+        ?string $idempotencyKey = null,
+        array $context = [],
+        ?\Closure $then = null,
+    ): bool;
 }
 
 namespace Rasuvaeff\Yii3WorkflowDb\Command;
