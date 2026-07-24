@@ -44,17 +44,6 @@
         "yiisoft/db-sqlite": "^2.0",
         "yiisoft/test-support": "^3.1"
     },
-    "repositories": [
-        {
-            "type": "path",
-            "url": "../yii3-workflow",
-            "options": {
-                "symlink": false
-            }
-        }
-    ],
-    "minimum-stability": "dev",
-    "prefer-stable": true,
     "autoload": {
         "psr-4": {
             "Rasuvaeff\\Yii3WorkflowDb\\": "src/"

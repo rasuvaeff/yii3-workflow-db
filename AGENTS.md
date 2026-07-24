@@ -26,14 +26,12 @@ Public API: `DbTransitionLog`, `WorkflowTransaction`,
 
 ## Commands
 
-No PHP/Composer on the host — run in Docker via the `composer:2` image. This
-package depends on the sibling core through a path repository, so mount the
-MONOREPO ROOT, not the package directory:
+No PHP/Composer on the host — run in Docker via the `composer:2` image.
 
 ```bash
-docker run --rm -v "$MONOREPO_ROOT":/repo -w /repo/yii3-workflow-db composer:2 composer build
-docker run --rm -v "$MONOREPO_ROOT":/repo -w /repo/yii3-workflow-db composer:2 composer test
-docker run --rm -v "$MONOREPO_ROOT":/repo -w /repo/yii3-workflow-db composer:2 composer test:integration
+docker run --rm -v "$PWD":/app -w /app composer:2 composer build
+docker run --rm -v "$PWD":/app -w /app composer:2 composer test
+docker run --rm -v "$PWD":/app -w /app composer:2 composer test:integration
 ```
 
 Or with Make from inside the package: `make build`, `make cs-fix`, `make psalm`,
@@ -41,10 +39,6 @@ Or with Make from inside the package: `make build`, `make cs-fix`, `make psalm`,
 
 ## Invariants & gotchas
 
-- **`composer.json` carries a path repository** to `../yii3-workflow` plus
-  `minimum-stability: dev` while the core is unpublished; the core declares a
-  `branch-alias` so its branch satisfies `^1.0`. Remove both once the core is on
-  Packagist — do not leave a path repo in a published package.
 - `append()` translates `IntegrityException` into the core's
   `DuplicateIdempotencyKey`, but only when the record actually carries a key;
   any other integrity failure (a schema drift, a NOT NULL violation) must
