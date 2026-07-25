@@ -6,7 +6,9 @@ Compact API reference for LLM coding assistants.
 
 ```
 composer require rasuvaeff/yii3-workflow-db
-./yii migrate:up --path=@vendor/rasuvaeff/yii3-workflow-db/migrations
+# register namespace Rasuvaeff\Yii3WorkflowDb\Migration via MigrationService::setSourceNamespaces()
+# migration class: Rasuvaeff\Yii3WorkflowDb\Migration\M260722000000CreateWorkflowTransitionsTable
+./yii migrate:up
 ```
 
 ## Rules

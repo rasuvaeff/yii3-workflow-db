@@ -39,6 +39,24 @@ Or with Make from inside the package: `make build`, `make cs-fix`, `make psalm`,
 
 ## Invariants & gotchas
 
+- **The table name is a VO, not a string, because `Injector` cannot resolve a
+  scalar.** `yiisoft/db-migration` builds migrations via `Injector::make()`,
+  which resolves arguments by name or by type and never reads a container
+  definition keyed by the migration's own class. Never reintroduce a scalar
+  `string $table` on a migration.
+- **One source of truth for the name and its validation.** `config/di.php`
+  builds `WorkflowTransitionsTableName` from `table_prefix` + `table` params and
+  passes it to both the log and the migration; the identifier regex lives only
+  in the VO (it used to be duplicated in two files).
+- **All three index names derive from the table name**, including the
+  driver-specific unique idempotency index. In PostgreSQL index names are unique
+  per schema, not per table.
+- Migrations live in `src/Migration/` and are therefore covered by cs, psalm and
+  infection. `MigrationTableNameTest` asserts the column set and each index's
+  columns.
+- `composer test` runs only the Unit suite; `composer mutation` runs every
+  suite. An integration test left pointing at `migrations/` passes the first and
+  fails the second.
 - `append()` translates `IntegrityException` into the core's
   `DuplicateIdempotencyKey`, but only when the record actually carries a key;
   any other integrity failure (a schema drift, a NOT NULL violation) must

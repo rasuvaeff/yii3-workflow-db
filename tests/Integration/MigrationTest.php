@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace Rasuvaeff\Yii3WorkflowDb\Tests\Integration;
 
-use M260722000000CreateWorkflowTransitionsTable;
+use Rasuvaeff\Yii3WorkflowDb\Migration\M260722000000CreateWorkflowTransitionsTable;
+use Rasuvaeff\Yii3WorkflowDb\WorkflowTransitionsTableName;
 use Testo\Assert;
 use Testo\Codecov\CoversNothing;
 use Testo\Expect;
@@ -30,8 +31,6 @@ final class MigrationTest
     #[BeforeTest]
     public function setUp(): void
     {
-        require_once dirname(__DIR__, 2) . '/migrations/M260722000000CreateWorkflowTransitionsTable.php';
-
         $this->db = new SqliteConnection(
             driver: new SqliteDriver(dsn: 'sqlite::memory:'),
             schemaCache: new SchemaCache(psrCache: new MemorySimpleCache()),
@@ -108,7 +107,7 @@ final class MigrationTest
 
     public function createsAUsableCustomTable(): void
     {
-        (new M260722000000CreateWorkflowTransitionsTable(table: 'custom_transitions'))->up($this->builder);
+        (new M260722000000CreateWorkflowTransitionsTable(table: new WorkflowTransitionsTableName('custom_transitions')))->up($this->builder);
 
         Assert::notNull($this->db->getTableSchema('custom_transitions', true));
         Assert::null($this->db->getTableSchema('workflow_transitions', true));
@@ -118,6 +117,6 @@ final class MigrationTest
     {
         Expect::exception(\InvalidArgumentException::class)->withMessageContaining('Invalid table name');
 
-        new M260722000000CreateWorkflowTransitionsTable(table: 'workflow transitions');
+        new M260722000000CreateWorkflowTransitionsTable(table: new WorkflowTransitionsTableName('workflow transitions'));
     }
 }

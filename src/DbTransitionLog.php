@@ -30,14 +30,20 @@ use Yiisoft\Db\Query\Query;
  */
 final readonly class DbTransitionLog implements TransitionLog
 {
-    /** @param non-empty-string $table */
+    private string $table;
+
+    /**
+     * @param non-empty-string $table
+     *
+     * @throws \InvalidArgumentException when the name is not a valid identifier
+     */
     public function __construct(
         private ConnectionInterface $db,
-        private string $table = 'workflow_transitions',
+        string $table = 'workflow_transitions',
     ) {
-        if (\preg_match('/^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)?$/D', $table) !== 1) {
-            throw new \InvalidArgumentException(sprintf('Invalid table name "%s"', $table));
-        }
+        // validation lives in the value object, so the log and the bundled
+        // migration cannot disagree about what a valid table name is
+        $this->table = (new WorkflowTransitionsTableName($table))->value;
     }
 
     /** @throws DuplicateIdempotencyKey */

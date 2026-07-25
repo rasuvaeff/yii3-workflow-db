@@ -7,6 +7,7 @@ namespace Rasuvaeff\Yii3WorkflowDb\Tests;
 use Rasuvaeff\Yii3Workflow\Audit\TransitionLog;
 use Rasuvaeff\Yii3WorkflowDb\Command\WorkflowTransitionsPruneCommand;
 use Rasuvaeff\Yii3WorkflowDb\DbTransitionLog;
+use Rasuvaeff\Yii3WorkflowDb\WorkflowTransitionsTableName;
 use Testo\Assert;
 use Testo\Codecov\CoversNothing;
 use Testo\Test;
@@ -28,6 +29,7 @@ final class ConfigWiringTest
     public function bindsTheAuditBackendAndItsCommand(): void
     {
         Assert::same(\array_keys($this->di()), [
+            WorkflowTransitionsTableName::class,
             DbTransitionLog::class,
             TransitionLog::class,
             WorkflowTransitionsPruneCommand::class,
@@ -43,17 +45,25 @@ final class ConfigWiringTest
 
     public function theLogFactoryHonoursTheConfiguredTable(): void
     {
-        $factory = $this->di(['table' => 'custom_transitions'])[DbTransitionLog::class];
+        $definitions = $this->di(['table' => 'custom_transitions']);
+        $factory = $definitions[DbTransitionLog::class];
 
         Assert::true(\is_callable($factory));
-        Assert::instanceOf($factory($this->db()), DbTransitionLog::class);
+        Assert::instanceOf($factory($this->db(), $this->tableName($definitions)), DbTransitionLog::class);
+    }
+
+    public function theTableNameFactoryAppliesThePrefix(): void
+    {
+        $definitions = $this->di(['table' => 'custom_transitions', 'table_prefix' => 'rsv_']);
+
+        Assert::same($this->tableName($definitions)->value, 'rsv_custom_transitions');
     }
 
     public function theCommandFactoryUsesTheConfiguredRetention(): void
     {
         $definitions = $this->di(['retentionDays' => 7]);
         $command = $definitions[WorkflowTransitionsPruneCommand::class](
-            $definitions[DbTransitionLog::class]($this->db()),
+            $definitions[DbTransitionLog::class]($this->db(), $this->tableName($definitions)),
             new StaticClock(new \DateTimeImmutable('2026-07-22T12:00:00+00:00')),
         );
 
@@ -66,8 +76,23 @@ final class ConfigWiringTest
         foreach ([[], ['table' => ''], ['table' => 42], ['retentionDays' => 0], ['retentionDays' => 'ten']] as $config) {
             $definitions = $this->di($config);
 
-            Assert::instanceOf($definitions[DbTransitionLog::class]($this->db()), DbTransitionLog::class);
+            Assert::instanceOf(
+                $definitions[DbTransitionLog::class]($this->db(), $this->tableName($definitions)),
+                DbTransitionLog::class,
+            );
         }
+    }
+
+    /**
+     * @param array<string, mixed> $definitions
+     */
+    private function tableName(array $definitions): WorkflowTransitionsTableName
+    {
+        $factory = $definitions[WorkflowTransitionsTableName::class];
+        Assert::true(\is_callable($factory));
+
+        /** @var WorkflowTransitionsTableName */
+        return $factory();
     }
 
     public function paramsRegisterThePruneCommand(): void
