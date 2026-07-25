@@ -41,12 +41,32 @@ check into a constraint.
 composer require rasuvaeff/yii3-workflow-db
 ```
 
-`yiisoft/config` wires `TransitionLog` to `DbTransitionLog` automatically. Then
-run the migration:
+`yiisoft/config` wires `TransitionLog` to `DbTransitionLog` automatically.
+Register the bundled migration (`Rasuvaeff\Yii3WorkflowDb\Migration\M260722000000CreateWorkflowTransitionsTable`)
+**by namespace** — no vendor paths:
+
+```php
+// config/common/di/migration.php
+use Yiisoft\Db\Migration\Service\MigrationService;
+
+return [
+    MigrationService::class => [
+        'setSourceNamespaces()' => [['App\\Migration', 'Rasuvaeff\\Yii3WorkflowDb\\Migration']],
+    ],
+];
+```
 
 ```bash
-./yii migrate:up --path=@vendor/rasuvaeff/yii3-workflow-db/migrations
+./yii migrate:up
 ```
+
+> **Do not configure the migration through the DI container.**
+> `M...::class => ['__construct()' => ['table' => ...]]` does not work: the
+> migration is built by `Injector::make()`, which resolves arguments by type
+> and never reads a container definition keyed by the migration's own class.
+> Worse, adding that definition makes the container fatal at build time in
+> **every** request, because the class is not autoloadable until the migration
+> runner requires it. That recipe was documented in 1.x; it never worked.
 
 ## Configuration
 
@@ -55,10 +75,17 @@ run the migration:
 return [
     'rasuvaeff/yii3-workflow-db' => [
         'table' => 'workflow_transitions',
+        'table_prefix' => '',    // prepended to `table`; e.g. 'rsv_' → rsv_workflow_transitions
         'retentionDays' => 90,   // default for workflow:transitions:prune
     ],
 ];
 ```
+
+The same name reaches `DbTransitionLog` **and** the bundled migration, as a
+`WorkflowTransitionsTableName`. Index names follow it
+(`idx_<table>_subject`, `idx_<table>_at`, `uq_<table>_idempotency`), so two
+installations can share one PostgreSQL schema — index names are unique per
+schema there, not per table.
 
 ## Schema
 

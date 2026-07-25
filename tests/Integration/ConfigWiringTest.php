@@ -6,6 +6,7 @@ namespace Rasuvaeff\Yii3WorkflowDb\Tests\Integration;
 
 use Rasuvaeff\Yii3Workflow\Audit\TransitionLog;
 use Rasuvaeff\Yii3WorkflowDb\DbTransitionLog;
+use Rasuvaeff\Yii3WorkflowDb\WorkflowTransitionsTableName;
 use Testo\Assert;
 use Testo\Codecov\CoversNothing;
 use Testo\Test;
@@ -37,9 +38,11 @@ final class ConfigWiringTest
             'rasuvaeff/yii3-workflow-db' => ['table' => 'custom_transitions'],
         ]);
         $factory = $definitions[DbTransitionLog::class];
+        $tableFactory = $definitions[WorkflowTransitionsTableName::class];
 
         Assert::true(is_callable($factory));
-        Assert::instanceOf($factory($this->sqlite()), DbTransitionLog::class);
+        Assert::true(is_callable($tableFactory));
+        Assert::instanceOf($factory($this->sqlite(), $tableFactory()), DbTransitionLog::class);
         Assert::same($definitions[TransitionLog::class], DbTransitionLog::class);
     }
 

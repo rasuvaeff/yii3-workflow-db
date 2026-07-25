@@ -5,11 +5,11 @@ declare(strict_types=1);
 namespace Rasuvaeff\Yii3WorkflowDb\Tests\Integration;
 
 use DateTimeImmutable;
-use M260722000000CreateWorkflowTransitionsTable;
 use Rasuvaeff\Yii3Workflow\Audit\TransitionRecord;
 use Rasuvaeff\Yii3Workflow\SubjectIdentity;
 use Rasuvaeff\Yii3Workflow\WorkflowFactory;
 use Rasuvaeff\Yii3WorkflowDb\DbTransitionLog;
+use Rasuvaeff\Yii3WorkflowDb\Migration\M260722000000CreateWorkflowTransitionsTable;
 use Testo\Assert;
 use Testo\Codecov\CoversNothing;
 use Testo\Lifecycle\AfterTest;
@@ -56,8 +56,6 @@ final class SqliteIntegrationTest
     #[BeforeTest]
     public function setUp(): void
     {
-        require_once dirname(__DIR__, 2) . '/migrations/M260722000000CreateWorkflowTransitionsTable.php';
-
         $this->db = new SqliteConnection(
             driver: new SqliteDriver(dsn: 'sqlite::memory:'),
             schemaCache: new SchemaCache(psrCache: new MemorySimpleCache()),

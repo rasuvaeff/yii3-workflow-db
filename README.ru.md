@@ -43,9 +43,31 @@ composer require rasuvaeff/yii3-workflow-db
 
 `yiisoft/config` сам свяжет `TransitionLog` с `DbTransitionLog`. Затем миграция:
 
-```bash
-./yii migrate:up --path=@vendor/rasuvaeff/yii3-workflow-db/migrations
+Класс миграции — `Rasuvaeff\Yii3WorkflowDb\Migration\M260722000000CreateWorkflowTransitionsTable`,
+регистрируется по namespace:
+
+```php
+// config/common/di/migration.php
+use Yiisoft\Db\Migration\Service\MigrationService;
+
+return [
+    MigrationService::class => [
+        'setSourceNamespaces()' => [['App\\Migration', 'Rasuvaeff\\Yii3WorkflowDb\\Migration']],
+    ],
+];
 ```
+
+```bash
+./yii migrate:up
+```
+
+> **Не настраивайте миграцию через DI-контейнер.**
+> `M...::class => ['__construct()' => ['table' => ...]]` не работает: миграцию
+> создаёт `Injector::make()`, который резолвит аргументы по типу и никогда не
+> читает определение контейнера по имени класса самой миграции. Хуже того,
+> добавление такого определения роняет контейнер на этапе сборки в **каждом**
+> запросе, потому что класс не автозагружается, пока его не подключит раннер
+> миграций. Этот рецепт был описан в 1.x и никогда не работал.
 
 ## Конфигурация
 
@@ -54,6 +76,7 @@ composer require rasuvaeff/yii3-workflow-db
 return [
     'rasuvaeff/yii3-workflow-db' => [
         'table' => 'workflow_transitions',
+        'table_prefix' => '',    // добавляется перед `table`; например 'rsv_' → rsv_workflow_transitions
         'retentionDays' => 90,   // значение по умолчанию для workflow:transitions:prune
     ],
 ];
