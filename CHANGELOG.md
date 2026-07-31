@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+- Docs: the documented `setSourceNamespaces()` migration registration does not
+  find the bundled migration and never has — `yiisoft/db-migration` matches the
+  PSR-4 map by string prefix and resolves into the core package, so
+  `./yii migrate:up` exits 0 having created nothing. Both READMEs now say so and
+  give a working `Injector`-based recipe until the upstream fix ships.
+
 ## 2.0.0 — 2026-07-25
 
 **Breaking.** See [UPGRADE.md](UPGRADE.md) — an installation that already
