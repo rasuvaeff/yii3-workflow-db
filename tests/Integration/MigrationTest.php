@@ -81,6 +81,58 @@ final class MigrationTest
         Assert::null($this->db->getTableSchema('workflow_transitions', true));
     }
 
+    /**
+     * The column list alone does not describe a schema.
+     *
+     * The original migration declared `'id' => 'bigprimarykey'` — a token that
+     * does not exist. SQLite stores an unknown type verbatim, so every column
+     * still existed and every insert still succeeded; only the value of `id`
+     * was NULL, and nothing here ever read it back. Assert the property that
+     * matters instead of the column's presence.
+     */
+    public function idIsAnAutoIncrementingPrimaryKey(): void
+    {
+        (new M260722000000CreateWorkflowTransitionsTable())->up($this->builder);
+
+        $column = $this->db->getTableSchema('workflow_transitions', true)?->getColumn('id');
+
+        Assert::notNull($column);
+        Assert::true($column?->isPrimaryKey());
+        Assert::true($column?->isAutoIncrement());
+
+        foreach (['pay', 'ship'] as $transition) {
+            $this->db->createCommand()->insert('workflow_transitions', [
+                'workflow' => 'order',
+                'subject_id' => 'order-1',
+                'transition' => $transition,
+                'from_place' => 'a',
+                'to_place' => 'b',
+                'at' => '2026-07-23T12:00:00+00:00',
+            ])->execute();
+        }
+
+        $ids = $this->db->createCommand('SELECT id FROM workflow_transitions ORDER BY id')->queryColumn();
+
+        Assert::same(\count($ids), 2);
+        Assert::same(\array_map(static fn(mixed $id): bool => \is_numeric($id) && (int) $id > 0, $ids), [true, true]);
+        Assert::true((int) $ids[0] !== (int) $ids[1]);
+    }
+
+    /**
+     * A pseudo-type that the driver does not know must never reach the DDL:
+     * SQLite would keep it verbatim rather than fail, hiding the mistake.
+     */
+    public function theDdlCarriesNoUnknownTypeToken(): void
+    {
+        (new M260722000000CreateWorkflowTransitionsTable())->up($this->builder);
+
+        $ddl = (string) $this->db
+            ->createCommand("SELECT sql FROM sqlite_master WHERE name = 'workflow_transitions'")
+            ->queryScalar();
+
+        Assert::false(\str_contains(\strtolower($ddl), 'bigprimarykey'));
+    }
+
     public function keyLessRowsRepeatFreelyUnderTheUniqueIndex(): void
     {
         // Most audit rows carry no idempotency key; the unique index must not

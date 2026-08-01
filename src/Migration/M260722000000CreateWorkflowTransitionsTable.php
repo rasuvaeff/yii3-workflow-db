@@ -8,6 +8,7 @@ use Rasuvaeff\Yii3WorkflowDb\WorkflowTransitionsTableName;
 use Yiisoft\Db\Migration\MigrationBuilder;
 use Yiisoft\Db\Migration\RevertibleMigrationInterface;
 use Yiisoft\Db\Migration\TransactionalMigrationInterface;
+use Yiisoft\Db\Schema\Column\ColumnBuilder;
 
 /**
  * Table behind rasuvaeff/yii3-workflow-db.
@@ -33,7 +34,11 @@ final class M260722000000CreateWorkflowTransitionsTable implements
     public function up(MigrationBuilder $b): void
     {
         $b->createTable($this->table->value, [
-            'id' => 'bigprimarykey',
+            // ColumnBuilder, not the string 'bigprimarykey': no such type token
+            // exists. SQLite accepts an unknown type silently — the column ends
+            // up without autoincrement and every id reads back as NULL — while
+            // MySQL and PostgreSQL reject the DDL outright.
+            'id' => ColumnBuilder::bigPrimaryKey(),
             'workflow' => 'string(64) NOT NULL',
             'subject_id' => 'string(128) NOT NULL',
             'transition' => 'string(64) NOT NULL',

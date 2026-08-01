@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+- **Fix: the migration created an unusable `id` column.** It declared
+  `'id' => 'bigprimarykey'`, which is not a type token — the real one is `bigpk`
+  (`ColumnBuilder::bigPrimaryKey()`). MySQL and PostgreSQL reject that DDL, so
+  the table was never created there; SQLite stores an unknown type verbatim, so
+  the table existed but `id` had no autoincrement and every row read back
+  `id = NULL`.
+
+  **An installation that applied the migration on SQLite must recreate the
+  table** (`down()` then `up()`); rows written so far carry no usable
+  identifier. Installations on MySQL or PostgreSQL never got past the
+  migration and need no cleanup.
+
+- Tests: the migration suite now asserts that `id` is an autoincrementing
+  primary key and reads inserted identifiers back, and that no unknown type
+  token reaches the DDL. The previous suite only checked that each column
+  existed, which an unknown type satisfies.
+
 ## 2.0.1 — 2026-08-01
 
 - Docs: the documented `setSourceNamespaces()` migration registration does not
