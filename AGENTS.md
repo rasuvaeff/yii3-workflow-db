@@ -54,6 +54,12 @@ Or with Make from inside the package: `make build`, `make cs-fix`, `make psalm`,
 - Migrations live in `src/Migration/` and are therefore covered by cs, psalm and
   infection. `MigrationTableNameTest` asserts the column set and each index's
   columns.
+- `setSourceNamespaces()` does NOT find them on any released
+  `yiisoft/db-migration` (≤ 2.0.1): it matches the PSR-4 map by string prefix,
+  so `Rasuvaeff\Yii3WorkflowDb\Migration` resolves into the core package and
+  discovery silently finds zero — `migrate:up` exits 0 having created nothing.
+  Until an upstream release carries the fix, migrations are applied directly via
+  `Injector::make($class)->up($builder)` — see the README.
 - `composer test` runs only the Unit suite; `composer mutation` runs every
   suite. An integration test left pointing at `migrations/` passes the first and
   fails the second.
@@ -84,7 +90,7 @@ Or with Make from inside the package: `make build`, `make cs-fix`, `make psalm`,
   non-array rows and validates every column with `string()`. Do not "simplify"
   that into a bare `array_map`, psalm level 1 rejects it and a half-hydrated
   record is worse than an exception.
-- The SQL schema is declared twice: in `migrations/` and inline in the tests
+- The SQL schema is declared twice: in `src/Migration/` and inline in the tests
   (and in `examples/audit-trail.php`). Change one, change all three.
 - Unit and integration tests run on in-memory SQLite through `yiisoft/db-sqlite`,
   so the integration suite covers real SQL and the migration, with no server.
