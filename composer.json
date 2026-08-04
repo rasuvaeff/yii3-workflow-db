@@ -28,7 +28,7 @@
         "rasuvaeff/yii3-workflow": "^1.0",
         "symfony/console": "^6.4 || ^7.0 || ^8.0",
         "yiisoft/db": "^2.0",
-        "yiisoft/db-migration": "^2.0"
+        "yiisoft/db-migration": "^2.1"
     },
     "require-dev": {
         "ergebnis/composer-normalize": "^2.51",
