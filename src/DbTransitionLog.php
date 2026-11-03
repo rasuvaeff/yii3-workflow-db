@@ -108,8 +108,11 @@ final readonly class DbTransitionLog implements TransitionLog
      *
      * @return list<TransitionRecord>
      */
-    public function latest(string $workflow, int $limit = 50, int $offset = 0): array
-    {
+    public function latest(
+        string $workflow,
+        int $limit = 50,
+        int $offset = 0,
+    ): array {
         if ($limit < 1) {
             throw new \InvalidArgumentException('Limit must be a positive integer');
         }

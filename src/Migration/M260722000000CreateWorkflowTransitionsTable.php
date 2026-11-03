@@ -70,9 +70,7 @@ final class M260722000000CreateWorkflowTransitionsTable implements
                 // key-less audit row of a subject would be rejected; filter the
                 // index down to keyed rows.
                 $b->execute(sprintf(
-                    'CREATE UNIQUE INDEX uq_%s_idempotency'
-                    . ' ON %s (workflow, subject_id, idempotency_key)'
-                    . ' WHERE idempotency_key IS NOT NULL',
+                    'CREATE UNIQUE INDEX uq_%s_idempotency ON %s (workflow, subject_id, idempotency_key) WHERE idempotency_key IS NOT NULL',
                     $this->table->forIndexName(),
                     $this->table->value,
                 ));
@@ -83,10 +81,7 @@ final class M260722000000CreateWorkflowTransitionsTable implements
                 // has no filtered indexes; NULL out every expression for
                 // key-less rows so they are not indexed at all.
                 $b->execute(sprintf(
-                    'CREATE UNIQUE INDEX uq_%s_idempotency ON %s ('
-                    . 'CASE WHEN idempotency_key IS NOT NULL THEN workflow END, '
-                    . 'CASE WHEN idempotency_key IS NOT NULL THEN subject_id END, '
-                    . 'idempotency_key)',
+                    'CREATE UNIQUE INDEX uq_%s_idempotency ON %s (CASE WHEN idempotency_key IS NOT NULL THEN workflow END, CASE WHEN idempotency_key IS NOT NULL THEN subject_id END, idempotency_key)',
                     $this->table->forIndexName(),
                     $this->table->value,
                 ));
