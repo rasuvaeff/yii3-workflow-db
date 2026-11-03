@@ -209,13 +209,23 @@ final class DbTransitionLogTest
         );
     }
 
-    public function rejectsInvalidLatestPaging(): void
+    public function rejectsANonPositiveLatestLimit(): void
     {
         Expect::exception(\InvalidArgumentException::class)->withMessageContaining('Limit');
         $this->log->latest('order', 0);
+    }
 
+    public function rejectsANegativeLatestOffset(): void
+    {
         Expect::exception(\InvalidArgumentException::class)->withMessageContaining('Offset');
         $this->log->latest('order', offset: -1);
+    }
+
+    public function acceptsAZeroLatestOffset(): void
+    {
+        $this->log->append($this->record(transition: 'pay'));
+
+        Assert::same(\count($this->log->latest('order', 1, offset: 0)), 1);
     }
 
     public function rejectsAnInvalidTableName(): void

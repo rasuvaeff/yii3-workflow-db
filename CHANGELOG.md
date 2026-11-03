@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+- Mutation testing now counts code the tests execute but do not name in `#[Covers]`
+  (`composer mutation` runs Infection with `--with-uncovered`, plus the signature-default
+  ignore and the visibility mutators switched off as in the package template).
+  Added `MigrationDriverBranchTest` (the MSSQL and Oracle index branches of the
+  migration, run on SQLite under a faked driver name, asserting the exact DDL) and
+  split `rejectsInvalidLatestPaging`, whose second `Expect::exception()` never ran.
+  Behaviour-neutral source reformatting: `DbTransitionLog::latest()` takes one
+  parameter per line, and the two MSSQL/Oracle `CREATE UNIQUE INDEX` statements are
+  single string literals instead of concatenations (identical SQL, asserted by the test).
+
 ## 2.0.3 — 2026-08-04
 
 ### Fixed
